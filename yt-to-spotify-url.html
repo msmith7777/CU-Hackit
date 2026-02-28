@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transmit — YouTube → Spotify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d0d;
+  --bg2: #141414;
+  --surface: #1a1a1a;
+  --surface2: #222222;
+  --border: #2e2e2e;
+  --border2: #3a3a3a;
+  --text: #f0ede8;
+  --text2: #a0a0a0;
+  --text3: #555;
+  --yt-red: #ff0000;
+  --yt-warm: #ff4444;
+  --spotify: #1db954;
+  --gold: #f5c842;
+  --radius: 12px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 50% 35% at 15% 20%, rgba(255,68,68,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 85% 75%, rgba(29,185,84,0.06) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px 100px;
+}
+
+/* ── HEADER ── */
+header {
+  margin-bottom: 48px;
+  animation: fadeUp 0.5s ease both;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.brand-icon {
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, var(--yt-red), #ff8800);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.brand-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.brand-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 100px;
+}
+
+.hero-title {
+  font-size: clamp(34px, 6vw, 64px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -3px;
+  margin-bottom: 14px;
+}
+
+.hero-title .yt { color: var(--yt-warm); }
+.hero-title .sp { color: var(--spotify); }
+.hero-title .arr {
+  color: var(--text3);
+  font-size: 0.65em;
+  letter-spacing: -1px;
+  margin: 0 6px;
+  display: inline-block;
+  animation: slide 2s ease-in-out infinite;
+}
+
+@keyframes slide {
+  0%,100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+
+.hero-sub {
+  font-size: 14px;
+  color: var(--text2);
+  font-weight: 300;
+  max-width: 480px;
+}
+
+/* ── PIPELINE ── */
+.pipeline {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  animation: fadeUp 0.5s 0.05s ease both;
+}
+
+.pipe-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pipe-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  transition: all 0.3s;
+}
+
+.pipe-circle.active { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px rgba(245,200,66,0.2); }
+.pipe-circle.done   { background: var(--spotify); border-color: var(--spotify); color: #000; font-size: 13px; }
+
+.pipe-label {
+  font-size: 9px;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+
+.pipe-node.active .pipe-label { color: var(--gold); }
+.pipe-node.done .pipe-label   { color: var(--spotify); }
+
+.pipe-connector {
+  flex: 1;
+  height: 1px;
+  min-width: 24px;
+  max-width: 60px;
+  background: var(--border);
+  margin: 0 4px;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pipe-connector::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--spotify);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s ease;
+}
+
+.pipe-connector.filled::after { transform: scaleX(1); }
+
+/* ── PANELS ── */
+.section {
+  margin-bottom: 14px;
+  animation: fadeUp 0.5s ease both;
+}
+
+.section:nth-child(1) { animation-delay: 0.08s; }
+.section:nth-child(2) { animation-delay: 0.13s; }
+.section:nth-child(3) { animation-delay: 0.18s; }
+.section:nth-child(4) { animation-delay: 0.23s; }
+
+.panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.ph-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ph-yt  { background: rgba(255,68,68,0.15); }
+.ph-sp  { background: rgba(29,185,84,0.15); }
+.ph-cfg { background: rgba(255,255,255,0.05); }
+
+.ph-text h3  { font-size: 13px; font-weight: 600; }
+.ph-text p   { font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+
+.panel-body { padding: 18px; }
+
+/* two column layout */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── FORM ── */
+.field { margin-bottom: 0; }
+
+.field label {
+  display: block;
+  font-size: 9.5px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 13px;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field input:focus, .field select:focus {
+  border-color: var(--border2);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+}
+
+.field input::placeholder { color: var(--text3); }
+
+.field select {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%23555' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.field select option { background: var(--surface2); }
+
+/* URL input special */
+.url-input-wrap {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.url-input-wrap .field { flex: 1; }
+
+/* callout */
+.callout {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.callout a    { color: var(--yt-warm); text-decoration: none; }
+.callout a:hover { text-decoration: underline; }
+.callout.sp a { color: var(--spotify); }
+.callout code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+}
+
+.callout strong { color: var(--text); font-weight: 500; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  font-family: 'Space Grotesk', sans-serif;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+.btn-yt {
+  background: var(--yt-warm);
+  color: #fff;
+  border-color: var(--yt-warm);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.btn-yt:hover:not(:disabled) { background: #ff6666; }
+
+.btn-sp {
+  background: var(--spotify);
+  color: #000;
+  border-color: var(--spotify);
+  font-weight: 600;
+}
+.btn-sp:hover:not(:disabled) { background: #22d460; }
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text2);
+  border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) { border-color: var(--border2); color: var(--text); }
+
+.btn-full {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+/* auth row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.pip.live {
+  background: var(--spotify);
+  box-shadow: 0 0 0 3px rgba(29,185,84,0.2);
+  animation: glow 2s infinite;
+}
+
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 0 3px rgba(29,185,84,0.15); }
+  50%      { box-shadow: 0 0 0 5px rgba(29,185,84,0.08); }
+}
+
+/* ── PLAYLIST PREVIEW CARD ── */
+.playlist-card {
+  display: none;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 14px;
+}
+
+.playlist-card.visible { display: flex; }
+
+.playlist-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+
+.playlist-thumb-placeholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.playlist-meta { flex: 1; min-width: 0; }
+.playlist-meta h4 {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.playlist-meta p {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── TRACK TABLE ── */
+.track-section { margin-top: 14px; }
+
+.table-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text3);
+}
+
+.table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.table-head {
+  display: grid;
+  grid-template-columns: 28px 1fr 140px 94px;
+  padding: 9px 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 9px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+  gap: 8px;
+}
+
+.table-body {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.table-body::-webkit-scrollbar { width: 3px; }
+.table-body::-webkit-scrollbar-track { background: var(--surface); }
+.table-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+.t-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 140px 94px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  font-size: 12.5px;
+  gap: 8px;
+  transition: background 0.12s;
+}
+
+.t-row:last-child { border-bottom: none; }
+.t-row:hover { background: var(--surface); }
+
+.t-idx {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  text-align: right;
+}
+
+.t-name strong {
+  display: block;
+  font-weight: 500;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-name small {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.t-channel {
+  font-size: 11.5px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.b-pending   { background: transparent;              border-color: var(--border);              color: var(--text3);   }
+.b-searching { background: rgba(245,200,66,0.08);   border-color: rgba(245,200,66,0.3);       color: var(--gold);    animation: blink 0.6s infinite; }
+.b-found     { background: rgba(29,185,84,0.08);    border-color: rgba(29,185,84,0.3);        color: var(--spotify); }
+.b-notfound  { background: rgba(255,68,68,0.08);    border-color: rgba(255,68,68,0.3);        color: var(--yt-warm); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ── PROGRESS ── */
+.prog-wrap {
+  height: 3px;
+  background: var(--surface2);
+  border-radius: 100px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--spotify), var(--gold));
+  border-radius: 100px;
+  transition: width 0.35s ease;
+  width: 0%;
+}
+
+.prog-label {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text3);
+}
+
+/* ── RESULT ── */
+.result-box {
+  display: none;
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  border: 1px solid;
+  margin-top: 16px;
+}
+
+.result-box.success { display: block; background: rgba(29,185,84,0.05); border-color: rgba(29,185,84,0.2); }
+.result-box.error   { display: block; background: rgba(255,68,68,0.05); border-color: rgba(255,68,68,0.2); }
+
+.result-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.result-emoji { font-size: 20px; }
+.result-head h3 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+.result-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.result-body a { color: var(--spotify); text-decoration: none; font-weight: 500; }
+.result-body a:hover { text-decoration: underline; }
+
+.result-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.pill {
+  padding: 4px 11px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid;
+}
+
+.pill-green { background: rgba(29,185,84,0.1); border-color: rgba(29,185,84,0.25); color: var(--spotify); }
+.pill-red   { background: rgba(255,68,68,0.1); border-color: rgba(255,68,68,0.25); color: var(--yt-warm); }
+.pill-gray  { background: var(--surface); border-color: var(--border); color: var(--text3); }
+
+/* ── STAT STRIP ── */
+.stat-strip {
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.stat-strip.on { display: grid; }
+@media (max-width:480px) { .stat-strip { grid-template-columns: repeat(2,1fr); } }
+
+.stat-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.s-val {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.s-val.green { color: var(--spotify); }
+.s-val.red   { color: var(--yt-warm); }
+.s-val.gold  { color: var(--gold); }
+.s-lbl { font-size: 9px; color: var(--text3); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; text-transform: uppercase; }
+
+/* ── SPINNER ── */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+/* loading overlay */
+.fetch-state {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.fetch-state.on { display: flex; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="brand-row">
+      <div class="brand-icon">▶</div>
+      <span class="brand-name">Transmit</span>
+      <span class="brand-tag">v2.0 — URL mode</span>
+    </div>
+    <div class="hero-title">
+      <span class="yt">YouTube</span>
+      <span class="arr">→→</span>
+      <span class="sp">Spotify</span>
+    </div>
+    <p class="hero-sub">Paste a YouTube Music playlist URL — every track is fetched automatically and transferred to your Spotify account.</p>
+  </header>
+
+  <!-- Pipeline -->
+  <div class="pipeline">
+    <div class="pipe-node active" id="pn1"><div class="pipe-circle active" id="pc1">1</div><div class="pipe-label">API Keys</div></div>
+    <div class="pipe-connector" id="pl1"></div>
+    <div class="pipe-node" id="pn2"><div class="pipe-circle" id="pc2">2</div><div class="pipe-label">Fetch YT</div></div>
+    <div class="pipe-connector" id="pl2"></div>
+    <div class="pipe-node" id="pn3"><div class="pipe-circle" id="pc3">3</div><div class="pipe-label">Auth Spotify</div></div>
+    <div class="pipe-connector" id="pl3"></div>
+    <div class="pipe-node" id="pn4"><div class="pipe-circle" id="pc4">4</div><div class="pipe-label">Match</div></div>
+    <div class="pipe-connector" id="pl4"></div>
+    <div class="pipe-node" id="pn5"><div class="pipe-circle" id="pc5">5</div><div class="pipe-label">Upload</div></div>
+  </div>
+
+  <!-- ── SECTION 1: API Keys ── -->
+  <div class="section">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="ph-icon ph-cfg">🔑</div>
+        <div class="ph-text">
+          <h3>API Credentials</h3>
+          <p>YouTube Data API v3 + Spotify OAuth PKCE</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="two-col">
+
+          <!-- YouTube API key -->
+          <div>
+            <div class="callout" style="margin-bottom:14px;">
+              <strong>YouTube API Key:</strong> Go to <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a> → New Project → Enable <strong>YouTube Data API v3</strong> → Credentials → Create API Key. It's free for up to 10,000 units/day.
+            </div>
+            <div class="field">
+              <label>YouTube Data API Key</label>
+              <input type="password" id="ytApiKey" placeholder="AIza...">
+            </div>
+          </div>
+
+          <!-- Spotify -->
+          <div>
+            <div class="callout sp" style="margin-bottom:14px;">
+              <strong>Spotify:</strong> Go to <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a> → Create App → add <code id="redirectDisplay">this page URL</code> as Redirect URI. Copy your Client ID.
+            </div>
+            <div class="field" style="margin-bottom:12px;">
+              <label>Spotify Client ID</label>
+              <input type="text" id="spClientId" placeholder="a1b2c3...">
+            </div>
+            <div class="auth-row" style="margin-top:0;">
+              <button class="btn btn-sp" onclick="authorizeSpotify()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                Connect Spotify
+              </button>
+              <div class="auth-status">
+                <div class="pip" id="spPip"></div>
+                <span id="spLabel">not connected</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: YouTube Playlist URL ── -->
+  <div class="section">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="ph-icon ph-yt">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#ff4444"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        </div>
+        <div class="ph-text">
+          <h3>YouTube Music Playlist</h3>
+          <p>paste a playlist URL — tracks are fetched automatically</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="callout">
+          Works with any <strong>YouTube</strong> or <strong>YouTube Music</strong> playlist URL. Examples:<br>
+          <code>https://www.youtube.com/playlist?list=PLxxxxxxx</code><br>
+          <code>https://music.youtube.com/playlist?list=PLxxxxxxx</code><br>
+          The playlist must be <strong>Public</strong> or <strong>Unlisted</strong> — private playlists require additional auth.
+        </div>
+
+        <div class="url-input-wrap">
+          <div class="field">
+            <label>Playlist URL</label>
+            <input type="url" id="ytUrl" placeholder="https://www.youtube.com/playlist?list=PLxxxxxxx" oninput="onUrlInput()">
+          </div>
+          <button class="btn btn-yt" id="fetchBtn" onclick="fetchPlaylist()" disabled>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            Fetch Tracks
+          </button>
+        </div>
+
+        <!-- Fetch loading state -->
+        <div class="fetch-state" id="fetchState">
+          <div class="spinner"></div>
+          <span id="fetchStateText">Fetching playlist...</span>
+        </div>
+
+        <!-- Playlist preview card -->
+        <div class="playlist-card" id="playlistCard">
+          <div class="playlist-thumb-placeholder" id="playlistThumbWrap">🎵</div>
+          <div class="playlist-meta">
+            <h4 id="playlistTitle">Playlist Title</h4>
+            <p id="playlistMeta">0 tracks · fetched from YouTube</p>
+          </div>
+        </div>
+
+        <!-- Track table -->
+        <div class="track-section" id="trackSection" style="display:none;">
+          <div class="table-meta">
+            <span id="tableCount">0 tracks</span>
+            <span id="tableWarning" style="color:var(--yt-warm);"></span>
+          </div>
+          <div class="table-wrap">
+            <div class="table-head">
+              <span>#</span>
+              <span>Title</span>
+              <span>Channel</span>
+              <span>Status</span>
+            </div>
+            <div class="table-body" id="tableBody"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 3: Playlist Options + Convert ── -->
+  <div class="section">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="ph-icon ph-sp">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#1db954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        </div>
+        <div class="ph-text">
+          <h3>Spotify Playlist Options</h3>
+          <p>configure then convert</p>
+        </div>
+      </div>
+      <div class="panel-body">
+
+        <div class="two-col" style="margin-bottom:12px;">
+          <div class="field">
+            <label>Playlist Name</label>
+            <input type="text" id="spName" value="My YouTube Music Playlist" placeholder="Name">
+          </div>
+          <div class="field">
+            <label>Visibility</label>
+            <select id="spPublic">
+              <option value="false">🔒 Private</option>
+              <option value="true">🌐 Public</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-bottom:16px;">
+          <div class="field">
+            <label>Description</label>
+            <input type="text" id="spDesc" placeholder="Converted from YouTube Music via Transmit">
+          </div>
+          <div class="field">
+            <label>Match Strategy</label>
+            <select id="matchStrategy">
+              <option value="loose" selected>Loose (more matches)</option>
+              <option value="strict">Strict (more accurate)</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-sp btn-full" id="convertBtn" onclick="startConversion()" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+          Convert &amp; Upload to Spotify
+        </button>
+
+        <!-- Progress -->
+        <div id="progSection" style="display:none; margin-top:18px;">
+          <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
+          <div class="prog-label" id="progLabel">Starting...</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-strip" id="statStrip">
+          <div class="stat-tile"><div class="s-val" id="sTotal">0</div><div class="s-lbl">Total</div></div>
+          <div class="stat-tile"><div class="s-val green" id="sFound">0</div><div class="s-lbl">Matched</div></div>
+          <div class="stat-tile"><div class="s-val red" id="sMissed">0</div><div class="s-lbl">Missed</div></div>
+          <div class="stat-tile"><div class="s-val gold" id="sRate">0%</div><div class="s-lbl">Match Rate</div></div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-box" id="resultBox">
+          <div class="result-head">
+            <span class="result-emoji" id="resEmoji"></span>
+            <h3 id="resTitle"></h3>
+          </div>
+          <div class="result-body" id="resBody"></div>
+          <div class="result-pills" id="resPills"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let spToken    = null;
+let spUserId   = null;
+let ytTracks   = [];   // [{id, title, channel, videoId, status, uri}]
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  const origin = location.href.split('?')[0].split('#')[0];
+  document.getElementById('redirectDisplay').textContent = origin;
+
+  // Restore saved keys
+  const savedSp = sessionStorage.getItem('sp_client_id');
+  const savedYt = sessionStorage.getItem('yt_api_key');
+  if (savedSp) document.getElementById('spClientId').value = savedSp;
+  if (savedYt) document.getElementById('ytApiKey').value   = savedYt;
+
+  handleSpotifyCallback();
+});
+
+// ═══════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function extractPlaylistId(url) {
+  // Handles youtube.com and music.youtube.com
+  try {
+    const u = new URL(url);
+    return u.searchParams.get('list');
+  } catch {
+    // Try regex fallback
+    const m = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PIPELINE UI
+// ═══════════════════════════════════════════════════════
+function setPipe(n, state) {
+  const c = document.getElementById(`pc${n}`);
+  const p = document.getElementById(`pn${n}`);
+  if (!c||!p) return;
+  c.className = `pipe-circle ${state}`;
+  p.className = `pipe-node ${state}`;
+  if (state === 'done') c.textContent = '✓';
+}
+
+function setLine(n, on) {
+  const l = document.getElementById(`pl${n}`);
+  if (l && on) l.classList.add('filled');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SPOTIFY OAUTH — PKCE
+// ═══════════════════════════════════════════════════════
+function rand32() {
+  const a = new Uint8Array(32);
+  crypto.getRandomValues(a);
+  return btoa(String.fromCharCode(...a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function sha256b64(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function authorizeSpotify() {
+  const clientId = document.getElementById('spClientId').value.trim();
+  if (!clientId) { alert('Enter your Spotify Client ID.'); return; }
+
+  const verifier    = rand32();
+  const challenge   = await sha256b64(verifier);
+  const redirectUri = location.href.split('?')[0].split('#')[0];
+
+  sessionStorage.setItem('pkce_v',       verifier);
+  sessionStorage.setItem('sp_client_id', clientId);
+  sessionStorage.setItem('yt_api_key',   document.getElementById('ytApiKey').value.trim());
+
+  const p = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    scope: 'playlist-modify-public playlist-modify-private',
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+  });
+
+  location.href = `https://accounts.spotify.com/authorize?${p}`;
+}
+
+async function handleSpotifyCallback() {
+  const p     = new URLSearchParams(location.search);
+  const code  = p.get('code');
+  const error = p.get('error');
+
+  if (error) {
+    history.replaceState({}, '', location.pathname);
+    showResult('error', '⚠️', 'Spotify authorization denied', error);
+    return;
+  }
+  if (!code) return;
+
+  const verifier    = sessionStorage.getItem('pkce_v');
+  const clientId    = sessionStorage.getItem('sp_client_id');
+  const savedYtKey  = sessionStorage.getItem('yt_api_key');
+  const redirectUri = location.href.split('?')[0].split('#')[0];
+
+  history.replaceState({}, '', location.pathname);
+
+  if (!verifier || !clientId) {
+    showResult('error', '⚠️', 'Session expired', 'Please reconnect Spotify.');
+    return;
+  }
+
+  // Restore API key
+  if (savedYtKey) document.getElementById('ytApiKey').value = savedYtKey;
+  document.getElementById('spClientId').value = clientId;
+
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        code_verifier: verifier,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.access_token) throw new Error(data.error_description || 'Token exchange failed');
+
+    spToken = data.access_token;
+
+    const user = await spFetch('https://api.spotify.com/v1/me');
+    spUserId = user.id;
+
+    document.getElementById('spPip').className   = 'pip live';
+    document.getElementById('spLabel').textContent = user.display_name || user.id;
+    setPipe(3, 'done');
+    setLine(2, true);
+    checkReady();
+
+  } catch (err) {
+    showResult('error', '⚠️', 'Spotify auth failed', err.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  YOUTUBE DATA API v3 — FETCH PLAYLIST
+// ═══════════════════════════════════════════════════════
+
+// Extract a clean "Song Name - Artist" from a YouTube video title
+// YouTube Music usually formats titles as:  "Song Name - Artist Topic" or "Artist - Song Name"
+function parseYouTubeTitle(title, channelName) {
+  // Strip " - Topic" suffix (YouTube Music auto-generated channels)
+  const channel = channelName.replace(/\s*-?\s*Topic$/i, '').trim();
+
+  // Try "Artist - Song" pattern (common in YouTube Music)
+  const dashMatch = title.match(/^(.+?)\s*[–—\-]\s*(.+)$/);
+  if (dashMatch) {
+    const part1 = dashMatch[1].trim();
+    const part2 = dashMatch[2].trim()
+      .replace(/\s*\(Official.*?\)/i, '')
+      .replace(/\s*\[Official.*?\]/i, '')
+      .replace(/\s*\(Lyrics.*?\)/i, '')
+      .replace(/\s*\[Lyrics.*?\]/i, '')
+      .replace(/\s*\(Audio.*?\)/i, '')
+      .replace(/\s*\[Audio.*?\]/i, '')
+      .replace(/\s*\(Video.*?\)/i, '')
+      .replace(/\s*\[Video.*?\]/i, '')
+      .replace(/\s*\(ft\..*?\)/i, '')
+      .replace(/\s*\(feat\..*?\)/i, '')
+      .trim();
+
+    // If part1 matches channel name, then: channel - song → artist=channel, song=part2
+    if (part1.toLowerCase() === channel.toLowerCase()) {
+      return { song: part2, artist: channel };
+    }
+    // Otherwise assume: song - artist
+    return { song: part1, artist: part2 || channel };
+  }
+
+  // No dash — just use title + channel as artist
+  const cleanTitle = title
+    .replace(/\s*\(Official.*?\)/i, '')
+    .replace(/\s*\[Official.*?\]/i, '')
+    .replace(/\s*\(Lyrics.*?\)/i, '')
+    .replace(/\s*\[Lyrics.*?\]/i, '')
+    .replace(/\s*\(Audio.*?\)/i, '')
+    .replace(/\s*\[Audio.*?\]/i, '')
+    .trim();
+
+  return { song: cleanTitle, artist: channel };
+}
+
+function onUrlInput() {
+  const val = document.getElementById('ytUrl').value.trim();
+  const id  = extractPlaylistId(val);
+  document.getElementById('fetchBtn').disabled = !id;
+}
+
+async function fetchPlaylist() {
+  const url    = document.getElementById('ytUrl').value.trim();
+  const apiKey = document.getElementById('ytApiKey').value.trim();
+
+  if (!apiKey) {
+    alert('Enter your YouTube Data API key first.');
+    return;
+  }
+
+  const playlistId = extractPlaylistId(url);
+  if (!playlistId) {
+    alert('Could not find a playlist ID in that URL. Make sure it contains ?list=...');
+    return;
+  }
+
+  // Save API key for after OAuth redirect
+  sessionStorage.setItem('yt_api_key', apiKey);
+
+  setFetchState(true, 'Fetching playlist info...');
+  document.getElementById('trackSection').style.display = 'none';
+  document.getElementById('playlistCard').className = 'playlist-card';
+  ytTracks = [];
+
+  try {
+    // ── Step 1: Get playlist metadata ──
+    const metaRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(playlistId)}&key=${encodeURIComponent(apiKey)}`
+    );
+    const metaData = await metaRes.json();
+
+    if (metaData.error) throw new Error(metaData.error.message);
+
+    const playlist = metaData.items?.[0];
+    if (!playlist) throw new Error('Playlist not found. Is it public or unlisted?');
+
+    const plTitle   = playlist.snippet.title;
+    const plThumb   = playlist.snippet.thumbnails?.medium?.url
+                   || playlist.snippet.thumbnails?.default?.url;
+
+    // ── Step 2: Paginate through all playlist items ──
+    setFetchState(true, `Fetching tracks for "${plTitle}"...`);
+
+    let allItems = [];
+    let pageToken = '';
+
+    do {
+      const pageUrl = `https://www.googleapis.com/youtube/v3/playlistItems`
+        + `?part=snippet&playlistId=${encodeURIComponent(playlistId)}`
+        + `&maxResults=50`
+        + `&key=${encodeURIComponent(apiKey)}`
+        + (pageToken ? `&pageToken=${pageToken}` : '');
+
+      const pageRes  = await fetch(pageUrl);
+      const pageData = await pageRes.json();
+
+      if (pageData.error) throw new Error(pageData.error.message);
+
+      allItems = allItems.concat(pageData.items || []);
+      pageToken = pageData.nextPageToken || '';
+
+      setFetchState(true, `Fetching tracks... (${allItems.length} so far)`);
+
+    } while (pageToken);
+
+    // ── Step 3: Build track list ──
+    ytTracks = allItems
+      .filter(item => item.snippet.title !== 'Deleted video' && item.snippet.title !== 'Private video')
+      .map((item, i) => {
+        const rawTitle  = item.snippet.title;
+        const channel   = item.snippet.videoOwnerChannelTitle || '';
+        const parsed    = parseYouTubeTitle(rawTitle, channel);
+        return {
+          id: i + 1,
+          rawTitle,
+          song:    parsed.song,
+          artist:  parsed.artist,
+          channel,
+          videoId: item.snippet.resourceId?.videoId,
+          status:  'pending',
+          uri:     null,
+        };
+      });
+
+    // ── Render ──
+    renderPlaylistCard(plTitle, plThumb, ytTracks.length);
+    renderTrackTable(ytTracks);
+    setFetchState(false);
+
+    // Update playlist name field
+    document.getElementById('spName').value = plTitle;
+
+    setPipe(2, 'done');
+    setLine(1, true);
+    checkReady();
+
+  } catch (err) {
+    setFetchState(false);
+    showResult('error', '⚠️', 'Failed to fetch playlist', err.message
+      + (err.message.includes('quota') ? '<br><br>You may have hit the YouTube API quota limit (10,000 units/day). Try again tomorrow or use a new API key.' : '')
+    );
+  }
+}
+
+function renderPlaylistCard(title, thumbUrl, count) {
+  const card     = document.getElementById('playlistCard');
+  const thumbEl  = document.getElementById('playlistThumbWrap');
+  const titleEl  = document.getElementById('playlistTitle');
+  const metaEl   = document.getElementById('playlistMeta');
+
+  titleEl.textContent = title;
+  metaEl.textContent  = `${count} track${count !== 1 ? 's' : ''} · fetched from YouTube`;
+
+  if (thumbUrl) {
+    thumbEl.outerHTML = `<img class="playlist-thumb" id="playlistThumbWrap" src="${thumbUrl}" alt="Playlist thumbnail">`;
+  }
+
+  card.className = 'playlist-card visible';
+}
+
+function renderTrackTable(tracks) {
+  const section = document.getElementById('trackSection');
+  const body    = document.getElementById('tableBody');
+  const countEl = document.getElementById('tableCount');
+
+  section.style.display = 'block';
+  countEl.textContent   = `${tracks.length} track${tracks.length !== 1 ? 's' : ''}`;
+
+  body.innerHTML = tracks.map(t => `
+    <div class="t-row" id="row${t.id}">
+      <span class="t-idx">${t.id}</span>
+      <div class="t-name">
+        <strong>${esc(t.song)}</strong>
+        <small>${esc(t.rawTitle)}</small>
+      </div>
+      <div class="t-channel">${esc(t.artist || t.channel)}</div>
+      <div><span class="badge b-pending" id="badge${t.id}">pending</span></div>
+    </div>
+  `).join('');
+}
+
+function setFetchState(on, text = '') {
+  const el = document.getElementById('fetchState');
+  el.className = on ? 'fetch-state on' : 'fetch-state';
+  if (text) document.getElementById('fetchStateText').textContent = text;
+  document.getElementById('fetchBtn').disabled = on;
+}
+
+// ═══════════════════════════════════════════════════════
+//  SPOTIFY API HELPERS
+// ═══════════════════════════════════════════════════════
+async function spFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${spToken}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function searchSpotify(track) {
+  const strategy = document.getElementById('matchStrategy').value;
+
+  // Clean artist: remove "- Topic", "VEVO", "Official" suffixes
+  const artist = track.artist
+    .replace(/\s*-?\s*Topic$/i, '')
+    .replace(/VEVO$/i, '')
+    .replace(/\s*Official$/i, '')
+    .replace(/feat\.?.+$/i, '')
+    .trim();
+
+  const song = track.song
+    .replace(/\(feat\.?.+?\)/i, '')
+    .replace(/\[feat\.?.+?\]/i, '')
+    .trim();
+
+  let q;
+  if (strategy === 'strict' && artist) {
+    q = `track:"${song}" artist:"${artist}"`;
+  } else {
+    q = artist ? `${song} ${artist}` : song;
+  }
+
+  const data = await spFetch(
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`
+  );
+
+  let result = data.tracks?.items?.[0] || null;
+
+  // Fallback: if strict found nothing, try loose
+  if (!result && strategy === 'strict') {
+    const fb = await spFetch(
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(song + ' ' + artist)}&type=track&limit=1`
+    );
+    result = fb.tracks?.items?.[0] || null;
+  }
+
+  return result;
+}
+
+async function createSpPlaylist(name, isPublic, desc) {
+  return spFetch(`https://api.spotify.com/v1/users/${spUserId}/playlists`, {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      public: isPublic === 'true',
+      description: desc || 'Converted from YouTube Music via Transmit',
+    }),
+  });
+}
+
+async function addToPlaylist(playlistId, uris) {
+  for (let i = 0; i < uris.length; i += 100) {
+    await spFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+      method: 'POST',
+      body: JSON.stringify({ uris: uris.slice(i, i + 100) }),
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONVERSION
+// ═══════════════════════════════════════════════════════
+async function startConversion() {
+  if (!spToken || ytTracks.length === 0) return;
+
+  const name     = document.getElementById('spName').value.trim()   || 'YouTube Music Playlist';
+  const isPublic = document.getElementById('spPublic').value;
+  const desc     = document.getElementById('spDesc').value.trim();
+
+  setConverting(true);
+  document.getElementById('progSection').style.display = 'block';
+  document.getElementById('resultBox').className = 'result-box';
+  document.getElementById('statStrip').className = 'stat-strip on';
+
+  setPipe(4, 'active');
+  setLine(3, true);
+
+  // Create playlist
+  setProgress(0, ytTracks.length, 'Creating Spotify playlist...');
+  let playlist;
+  try {
+    playlist = await createSpPlaylist(name, isPublic, desc);
+  } catch (err) {
+    setConverting(false);
+    showResult('error', '⚠️', 'Failed to create playlist', err.message);
+    return;
+  }
+
+  // Search + match
+  const uris = [];
+  let found = 0, missed = 0;
+
+  for (let i = 0; i < ytTracks.length; i++) {
+    const t     = ytTracks[i];
+    const badge = document.getElementById(`badge${t.id}`);
+    const row   = document.getElementById(`row${t.id}`);
+
+    row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (badge) { badge.className = 'badge b-searching'; badge.textContent = '⟳ searching'; }
+
+    setProgress(i, ytTracks.length, `Matching: ${t.song}`);
+    updateStats(ytTracks.length, found, missed);
+
+    try {
+      const result = await searchSpotify(t);
+      if (result) {
+        uris.push(result.uri);
+        found++;
+        if (badge) { badge.className = 'badge b-found'; badge.textContent = '✓ found'; }
+      } else {
+        missed++;
+        if (badge) { badge.className = 'badge b-notfound'; badge.textContent = '✗ miss'; }
+      }
+    } catch (err) {
+      missed++;
+      if (badge) { badge.className = 'badge b-notfound'; badge.textContent = '✗ error'; }
+    }
+
+    await sleep(140);
+  }
+
+  // Upload
+  setPipe(5, 'active');
+  setLine(4, true);
+  setProgress(ytTracks.length, ytTracks.length, `Uploading ${found} tracks...`);
+
+  try {
+    if (uris.length > 0) await addToPlaylist(playlist.id, uris);
+  } catch (err) {
+    setConverting(false);
+    showResult('error', '⚠️', 'Failed to upload tracks', err.message);
+    return;
+  }
+
+  setPipe(4, 'done');
+  setPipe(5, 'done');
+  setProgress(ytTracks.length, ytTracks.length, 'Done! 🎉');
+  updateStats(ytTracks.length, found, missed);
+  setConverting(false);
+
+  const openUrl = playlist.external_urls?.spotify;
+  const rate    = Math.round((found / ytTracks.length) * 100);
+
+  showResult(
+    'success',
+    '🟢',
+    `${found} of ${ytTracks.length} tracks uploaded`,
+    (missed > 0
+      ? `${missed} track${missed !== 1 ? 's' : ''} couldn't be matched on Spotify.`
+      : 'Every track was matched! 🎯')
+    + (openUrl ? `<br><br><a href="${openUrl}" target="_blank">Open "${name}" on Spotify →</a>` : ''),
+    [
+      { txt: `${found} matched`,  cls: 'pill-green' },
+      { txt: `${missed} missed`,  cls: missed > 0 ? 'pill-red' : 'pill-gray' },
+      { txt: `${rate}% match`,    cls: 'pill-green' },
+      { txt: `${ytTracks.length} total`, cls: 'pill-gray' },
+    ]
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════
+function checkReady() {
+  document.getElementById('convertBtn').disabled = !(spToken && ytTracks.length > 0);
+}
+
+function setConverting(on) {
+  document.getElementById('convertBtn').disabled = on;
+  document.getElementById('convertBtn').innerHTML = on
+    ? '<div class="spinner"></div> Converting...'
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg> Convert &amp; Upload to Spotify`;
+}
+
+function setProgress(done, total, label) {
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('progFill').style.width  = pct + '%';
+  document.getElementById('progLabel').textContent = `${label}  (${done}/${total})`;
+}
+
+function updateStats(total, found, missed) {
+  document.getElementById('sTotal').textContent  = total;
+  document.getElementById('sFound').textContent  = found;
+  document.getElementById('sMissed').textContent = missed;
+  document.getElementById('sRate').textContent   = total ? Math.round((found/total)*100)+'%' : '0%';
+}
+
+function showResult(type, emoji, title, body, pills = []) {
+  const box = document.getElementById('resultBox');
+  box.className = `result-box ${type}`;
+  document.getElementById('resEmoji').textContent = emoji;
+  document.getElementById('resTitle').textContent = title;
+  document.getElementById('resBody').innerHTML    = body;
+  document.getElementById('resPills').innerHTML  = pills.map(p =>
+    `<span class="pill ${p.cls}">${p.txt}</span>`
+  ).join('');
+}
+</script>
+</body>
+</html>
